@@ -50,7 +50,7 @@ object Main extends ZIOAppDefault:
       _ <- ZIO.foreach(pairs)(pair => ZIO.debug("Hi " + pair.from.name + ". You will be getting a gift for " + pair.to.name))
       gmailAppPassword <- zio.System.env("GMAIL_APP_PASSWORD").debug("password")
       gmailSender <- zio.System.env("GMAIL_SENDER")
-//      _ <- ZIO.attempt(mailStuff(gmailSender.get, "halifrasure@gmail.com", gmailAppPassword.get, content))
+//      _ <- mailStuff(gmailSender.get, "halifrasure@gmail.com", gmailAppPassword.get, content)
     yield ()
 
   val readParticipants = ZIO.attempt {
@@ -61,7 +61,7 @@ object Main extends ZIOAppDefault:
     }
   }
 
-  def mailStuff(from: String, to: String, appPassword: String, content: String) = {
+  def mailStuff(from: String, to: String, appPassword: String, content: String) = ZIO.attempt {
     import javax.mail.Message
     import javax.mail.MessagingException
     import javax.mail.Session
@@ -93,7 +93,7 @@ object Main extends ZIOAppDefault:
     try { // Create a default MimeMessage object.
       val message = new MimeMessage(session)
       // Set From: header field of the header.
-      message.setFrom(new InternetAddress(from))
+      message.setFrom(new InternetAddress(from)) // TODO Can I provide a capitalized, spaced name here?
       // Set To: header field of the header.
       message.addRecipient(Message.RecipientType.TO, new InternetAddress(to))
       // Set Subject: header field
