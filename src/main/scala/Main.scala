@@ -30,11 +30,10 @@ case class State(
 object Participant:
   def matchMake(participants: List[Participant]) =
     for
-      _ <- ZIO.debug("TODO")
       finalState <- ZIO.foldLeft(participants)(State(List.empty, participants))(
         (state, participant) =>
           for
-            receiverIdx <- zio.Random.nextIntBounded(state.openReceivers.size).repeatUntil( target => state.openReceivers(target) != participant)
+            receiverIdx <- (ZIO.debug("CHoosing random recipient") *> zio.Random.nextIntBounded(state.openReceivers.size)).repeatUntil( target => state.openReceivers(target) != participant)
             receiver = state.openReceivers(receiverIdx)
           yield state.copy(matches = GiftPair(participant, receiver) :: state.matches, openReceivers = state.openReceivers.filter(_ != receiver))
       )
@@ -44,14 +43,14 @@ object Participant:
 object Main extends ZIOAppDefault:
   override def run: ZIO[Environment & ZIOAppArgs & Scope, Any, Any] =
     for
-      _ <- printLine("Welcome to your first ZIO app!")
       participants <- readParticipants
       pairs <- Participant.matchMake(participants)
-      content = pairs.map(pair => "From: " + pair.from.name  + "\t To: " + pair.to.name).mkString("\n")
+      content = pairs.map(pair =>  pair.from.name  + " will be sending a gift to " + pair.to.name).mkString("\n")
       _ <- ZIO.debug(content)
+      _ <- ZIO.foreach(pairs)(pair => ZIO.debug("Hi " + pair.from.name + ". You will be getting a gift for " + pair.to.name))
       gmailAppPassword <- zio.System.env("GMAIL_APP_PASSWORD").debug("password")
       gmailSender <- zio.System.env("GMAIL_SENDER")
-      _ <- ZIO.attempt(mailStuff(gmailSender.get, "bill@billdingsoftware.com", gmailAppPassword.get, content))
+//      _ <- ZIO.attempt(mailStuff(gmailSender.get, "halifrasure@gmail.com", gmailAppPassword.get, content))
     yield ()
 
   val readParticipants = ZIO.attempt {
@@ -89,7 +88,7 @@ object Main extends ZIOAppDefault:
     })
 
     // Used to debug SMTP issues
-    session.setDebug(true)
+//    session.setDebug(true)
 
     try { // Create a default MimeMessage object.
       val message = new MimeMessage(session)
