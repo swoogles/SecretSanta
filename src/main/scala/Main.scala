@@ -54,15 +54,24 @@ object Main extends ZIOAppDefault:
 
   def buildEmail(pair: GiftPair) =
     s"""
-      | Ho ho ho!
-      | Hello there ${pair.from.name}.
+      | Ho ho *hiccup* ho! Hello there ${pair.from.name}!
       | Santa has been hitting the sauce a bit too hard this year!
       | Unfortunately with my recent SUI, I won't be able to get deliver everyone's gifts this year!
       | In order to save Christmas, you need to lend me a holiday hand.
       |
-      | You will be getting a gift for ${pair.to.name}
-      | Now I know they don't really _deserve_ a fancy gift
+      | You need to get a gift for ${pair.to.name}!
+      | Now You might think that they deserve *many* gifts.
+      | You might think that they don't deserve a gift at all!
+      | In any case, if I don't deliver 1 gift to everyone on earth by Christmas, I will have broken the terms of my North Pole lease and Santa will be out on his ass by New Years.
       |""".stripMargin
+      +
+      """
+        |
+        | ======================
+        |
+        | This was sent by a program, even though it looks like Bill sent it to you by hand.
+        | Don't respond to this email, because then he might accidentally read who your recipient is!
+        |""".stripMargin
 
   val readParticipants = ZIO.attempt {
     val lines = Source.fromFile("names_and_emails.txt").getLines.toList
@@ -104,7 +113,7 @@ object Main extends ZIOAppDefault:
     try { // Create a default MimeMessage object.
       val message = new MimeMessage(session)
       // Set From: header field of the header.
-      message.setFrom(new InternetAddress(from)) // TODO Can I provide a capitalized, spaced name here?
+      message.setFrom(new InternetAddress(from, "Santa")) // TODO Can I provide a capitalized, spaced name here?
       // Set To: header field of the header.
       message.addRecipient(Message.RecipientType.TO, new InternetAddress(to))
       // Set Subject: header field
