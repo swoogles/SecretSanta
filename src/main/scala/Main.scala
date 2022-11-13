@@ -33,11 +33,11 @@ object Participant:
       finalState <- ZIO.foldLeft(participants)(State(List.empty, participants))(
         (state, participant) =>
           for
-            receiverIdx <- (ZIO.debug("CHoosing random recipient") *> zio.Random.nextIntBounded(state.openReceivers.size)).repeatUntil( target => state.openReceivers(target) != participant)
+            receiverIdx <- (ZIO.debug("Choosing random recipient") *> zio.Random.nextIntBounded(state.openReceivers.size))
+              .repeatUntil( target => state.openReceivers(target) != participant)
             receiver = state.openReceivers(receiverIdx)
           yield state.copy(matches = GiftPair(participant, receiver) :: state.matches, openReceivers = state.openReceivers.filter(_ != receiver))
       )
-//      _ <- participants.foldLeft[State]()
     yield finalState.matches
 
 object Main extends ZIOAppDefault:
@@ -45,13 +45,24 @@ object Main extends ZIOAppDefault:
     for
       participants <- readParticipants
       pairs <- Participant.matchMake(participants)
-      content = pairs.map(pair =>  pair.from.name  + " will be sending a gift to " + pair.to.name).mkString("\n")
-      _ <- ZIO.debug(content)
-      _ <- ZIO.foreach(pairs)(pair => ZIO.debug("Hi " + pair.from.name + ". You will be getting a gift for " + pair.to.name))
-      gmailAppPassword <- zio.System.env("GMAIL_APP_PASSWORD").debug("password")
+      _ <- ZIO.foreach(pairs)(pair => ZIO.debug(buildEmail(pair)))
+      gmailAppPassword <- zio.System.env("GMAIL_APP_PASSWORD")
       gmailSender <- zio.System.env("GMAIL_SENDER")
+      _ <- ZIO.foreach(pairs.headOption)(pair => mailStuff(gmailSender.get, "bill@billdingsoftware.com", gmailAppPassword.get, buildEmail(pair)))
 //      _ <- mailStuff(gmailSender.get, "halifrasure@gmail.com", gmailAppPassword.get, content)
     yield ()
+
+  def buildEmail(pair: GiftPair) =
+    s"""
+      | Ho ho ho!
+      | Hello there ${pair.from.name}.
+      | Santa has been hitting the sauce a bit too hard this year!
+      | Unfortunately with my recent SUI, I won't be able to get deliver everyone's gifts this year!
+      | In order to save Christmas, you need to lend me a holiday hand.
+      |
+      | You will be getting a gift for ${pair.to.name}
+      | Now I know they don't really _deserve_ a fancy gift
+      |""".stripMargin
 
   val readParticipants = ZIO.attempt {
     val lines = Source.fromFile("names_and_emails.txt").getLines.toList
