@@ -55,14 +55,25 @@ object Main extends ZIOAppDefault:
   def buildEmail(pair: GiftPair) =
     s"""
       | Ho ho *hiccup* ho! Hello there ${pair.from.name}!
-      | Santa has been hitting the sauce a bit too hard this year!
-      | Unfortunately with my recent SUI, I won't be able to get deliver everyone's gifts this year!
-      | In order to save Christmas, you need to lend me a holiday hand.
+      | I hope you are having a merry season!
+      | I trust your family is well.
+      |
+      | Santa has a bit of a situation on his hands.
+      | The Elves started were talking a few days ago, when the topic of salaries came up.
+      | Despite my efforts to explain that passion is its own reward, they no longer recognize "Christmas Cheer" as a valid currency.
+      | As I write this, I've got hundreds of agitated toy sla-...associates - Toy associates - shouting all sorts of troubling things about the means of production.
+      |
+      | But enough about me, I will cut to the point - In order to save Christmas, you need to lend me a holiday hand.
       |
       | You need to get a gift for ${pair.to.name}!
-      | Now You might think that they deserve *many* gifts.
-      | You might think that they don't deserve a gift at all!
-      | In any case, if I don't deliver 1 gift to everyone on earth by Christmas, I will have broken the terms of my North Pole lease and Santa will be out on his ass by New Years.
+      |
+      | I will be honest - I have no idea whether they deserve a gift or not.
+      | I haven't tracked naughty/nice for years.
+      | I signed an extremely demanding contract with Amazon back in 2010, and it states that I will provide at least 1 gift to every human on earth by Christmas morning.
+      | I tried to push for a morality clause - I really did - but Grinch Bezos broke Santa's fingers for saying the "M" word in front of him.
+      |
+      | If I don't meet my quota, these Elves will be the least of my worries.
+      | Please ${pair.from.name}, help me save Christmas!
       |""".stripMargin
       +
       """
