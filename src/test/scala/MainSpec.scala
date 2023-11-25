@@ -58,4 +58,4 @@ object MainSpec extends ZIOSpecDefault:
       ZLayer.derive[EmailServiceTest],
       ZLayer.derive[EmailBuilderTest],
       ZLayer.derive[ParticipantServiceTest]
-    ) @@ TestAspect.withLiveRandom
+    ) @@ TestAspect.withLiveRandom @@ TestAspect.timeout(2.seconds)

@@ -35,7 +35,12 @@ object Participant:
         (state, participant) =>
           for
             receiverIdx <- (ZIO.debug("Choosing random recipient") *> zio.Random.nextIntBounded(state.openReceivers.size))
-              .repeatUntil( target => state.openReceivers(target) != participant)
+              .repeatUntil { target =>
+                val potentialReceiver = state.openReceivers(target)
+                potentialReceiver != participant &&
+                  // This ensures kids send a gift to a member of a different family :)
+                  potentialReceiver.email != participant.email
+              }
             receiver = state.openReceivers(receiverIdx)
           yield state.copy(matches = GiftPair(participant, receiver) :: state.matches, openReceivers = state.openReceivers.filter(_ != receiver))
       )
