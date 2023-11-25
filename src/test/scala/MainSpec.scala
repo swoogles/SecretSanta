@@ -2,10 +2,6 @@ import zio.*
 import zio.direct.*
 import zio.test.*
 
-case class EmailServiceTest() extends EmailService:
-  def send(to: String, content: String): ZIO[Any, Throwable, Unit] =
-    Console.printLine(s"Sending email to $to with content $content")
-
 case class ParticipantServiceTest() extends ParticipantService:
 
   val readParticipants: ZIO[Any, Throwable, List[Participant]] =
@@ -56,6 +52,7 @@ object MainSpec extends ZIOSpecDefault:
       }
     ).provide(
       ZLayer.derive[EmailServiceTest],
-      ZLayer.derive[EmailBuilderTest],
+//      ZLayer.derive[EmailBuilderTest],
+      ZLayer.derive[EmailBuilder.Kid],
       ZLayer.derive[ParticipantServiceTest]
     ) @@ TestAspect.withLiveRandom @@ TestAspect.timeout(2.seconds)

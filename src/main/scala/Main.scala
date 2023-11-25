@@ -1,8 +1,8 @@
-import zio.{Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
+import zio.{Scope, Schedule, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer, durationInt}
 import zio.Console.printLine
+import java.util.Properties
 import zio.direct.*
 
-import java.util.Properties
 import javax.mail.{Authenticator, Message, MessagingException, PasswordAuthentication, Session, Transport}
 import javax.mail.internet.InternetAddress
 import javax.mail.internet.MimeMessage
@@ -27,7 +27,7 @@ case class State(
                 )
 
 
-case class Participant(name: String, email: String)
+case class Participant(name: String, email: String, family: String)
 object Participant:
   def matchMake(participants: List[Participant]) =
     for
@@ -39,7 +39,7 @@ object Participant:
                 val potentialReceiver = state.openReceivers(target)
                 potentialReceiver != participant &&
                   // This ensures kids send a gift to a member of a different family :)
-                  potentialReceiver.email != participant.email
+                  potentialReceiver.family != participant.family
               }
             receiver = state.openReceivers(receiverIdx)
           yield state.copy(matches = GiftPair(participant, receiver) :: state.matches, openReceivers = state.openReceivers.filter(_ != receiver))
@@ -47,19 +47,28 @@ object Participant:
     yield finalState.matches
 
 object Main extends ZIOAppDefault:
-  override def run: ZIO[Environment & ZIOAppArgs & Scope, Any, Any] =
-    (logic).provide(ZLayer.derive[EmailBuilder.Live], EmailService.live, ZLayer.derive[ParticipantService.Live])
+  override def run =
+    (logic).provide(
+      ZLayer.derive[EmailBuilder.Kid],
+//      EmailService.live, // TODO Make quarantined area that uses this
+      ZLayer.derive[EmailServiceTest],
+      ZLayer.derive[ParticipantService.Live]
+    )
 
   val logic =
     for
       participants <- ZIO.serviceWithZIO[ParticipantService](_.readParticipants)
-      pairs <- Participant.matchMake(participants)
+      pairs <-
+        Participant.matchMake(participants)
+          .timeoutFail(Exception("Impossible matches"))(1.seconds)
+          .retry(Schedule.forever)
+      _ <- ZIO.debug("Pairs: " + pairs)
       // Test run that only sends to me
       //      _ <- ZIO.foreach(pairs.headOption)(pair => mailStuff(gmailSender.get, "bill@billdingsoftware.com", gmailAppPassword.get, buildEmail(pair)))
       _ <- ZIO.foreach(pairs)(
         pair =>
           for {
-            emailContent <- ZIO.serviceWith[EmailBuilder](_.buildEmail(pair))
+            emailContent <- ZIO.serviceWith[EmailBuilder](_.buildEmail(pair)).debug
             _ <- ZIO.serviceWithZIO[EmailService](_.send(pair.from.email, emailContent))
           } yield ()
       )
@@ -70,12 +79,13 @@ trait ParticipantService:
 
 
 object ParticipantService:
+  // TODO Accept filename as param
   case class Live() extends ParticipantService:
     val readParticipants = ZIO.attempt {
-      val lines = Source.fromFile("names_and_emails.txt").getLines.toList
+      val lines = Source.fromFile("az_christmas_kids.txt").getLines.toList
       lines.map { line =>
         val pieces = line.split(",")
-        Participant(pieces(0), pieces(1))
+        Participant(pieces(0), pieces(1), pieces(2))
       }
     }
 
@@ -84,6 +94,23 @@ trait EmailBuilder:
   def buildEmail(pair: GiftPair): String
 
 object EmailBuilder:
+  case class Kid() extends EmailBuilder:
+    override def buildEmail(pair: GiftPair): String =
+      s"""
+         |${pair.from.name}, this is Santa, and I need your help!
+         |I was just checking the Naughty Or Nice list to see what the elves should make for your cousin ${pair.to.name} and I discovered that we lost all of the notes for them!
+         |
+         |The elves follow a strict code of conduct, and they won't make anything for a child unless they have notes for the whole year!
+         |It's too late to make new notes, so I need you to take responsibility for your cousin's gift!
+         |
+         |You might not know what they want for Christmas, so you should talk with your parents to figure out what a good gift would be.
+         |But please, don't tell *anyone* else about this!
+         |It's a secret!
+         |
+         |Thank you so much ${pair.from.name}!
+         |With your help, we can save Christmas!
+         |""".stripMargin
+
   case class Live() extends EmailBuilder:
 
     def buildEmail(pair: GiftPair) =
@@ -120,16 +147,21 @@ trait EmailService:
 object EmailService:
 
   case class Live(from: String, appPassword: String) extends EmailService:
-    def send(to: String, content: String) = ZIO.attempt:
+    def send(to: String, content: String) =
       mailStuff(from, to, appPassword, content)
 
   val live = ZLayer.fromZIO:
     defer {
       Live(
-        zio.System.env("GMAIL_APP_PASSWORD").run.get,
-        zio.System.env("GMAIL_SENDER").run.get
+        zio.System.env("GMAIL_SENDER").debug("sender").run.get,
+        zio.System.env("GMAIL_APP_PASSWORD").debug("password").run.get,
       )
     }
+
+case class EmailServiceTest() extends EmailService:
+  def send(to: String, content: String): ZIO[Any, Throwable, Unit] =
+    zio.Console.printLine(s"Sending email to $to with content $content")
+
 
 def mailStuff(from: String, to: String, appPassword: String, content: String) = ZIO.attempt {
     import javax.mail.Message
@@ -138,9 +170,8 @@ def mailStuff(from: String, to: String, appPassword: String, content: String) = 
     import javax.mail.Transport
     import javax.mail.internet.InternetAddress
     import javax.mail.internet.MimeMessage
-    import java.util.Properties
 
-    // Assuming you are sending email from through gmails smtp
+    // Assuming you are sending email through gmails smtp
     val host = "smtp.gmail.com"
 
     // Get system properties
@@ -153,6 +184,8 @@ def mailStuff(from: String, to: String, appPassword: String, content: String) = 
     properties.put("mail.smtp.auth", "true")
 
     // Get the Session object.// and pass username and password
+    println("From: " + from)
+    println("appPassword: " + appPassword)
     val session = Session.getInstance(properties, new Authenticator() {
       override protected def getPasswordAuthentication = new PasswordAuthentication(from, appPassword)
     })
@@ -160,17 +193,12 @@ def mailStuff(from: String, to: String, appPassword: String, content: String) = 
     // Used to debug SMTP issues
 //    session.setDebug(true)
 
-    try { // Create a default MimeMessage object.
+    try {
       val message = new MimeMessage(session)
-      // Set From: header field of the header.
       message.setFrom(new InternetAddress(from, "Santa")) // TODO Can I provide a capitalized, spaced name here?
-      // Set To: header field of the header.
       message.addRecipient(Message.RecipientType.TO, new InternetAddress(to))
-      // Set Subject: header field
       message.setSubject("Secret Santa")
-      // Now set the actual message
       message.setText(content)
-      System.out.println("About to send")
       // Send message
       Transport.send(message)
       System.out.println("Sent message successfully....")
