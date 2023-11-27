@@ -111,7 +111,7 @@ object EmailBuilder:
          |With your help, we can save Christmas!
          |""".stripMargin
 
-  case class Live() extends EmailBuilder:
+  case class AdultElfRevolt() extends EmailBuilder:
 
     def buildEmail(pair: GiftPair) =
       s"""
